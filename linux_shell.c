@@ -18,13 +18,14 @@ enum tokentype {
 	REDIR
 };
 
-struct cmdline 									//Structure for the parse tree node which represents the command.
+struct cmdline                    //Structure for the parse tree node which represents the command.
 {
-	enum tokentype type;						//one of the type: PIPE, REDIR, BASECMD.
-	int argsc;									//number of tokens.
-	char** argsv;                               //holds the tokens for command.
-	struct cmdline *left;						//For left child node.
-	struct cmdline *right;						//For right child node.
+	enum tokentype type;         //one of the type: PIPE, REDIR, BASECMD.
+	int argsc;                   //number of tokens.
+	int fd;                      //for file descriptor use in REDIR
+	char** argsv;                //holds the tokens for command.
+	struct cmdline *left;        //For left child node.
+	struct cmdline *right;       //For right child node.
 };
 
 char** globltokens;
@@ -179,11 +180,44 @@ struct cmdline* creatpt(char** tokens, int start, int end, int* validcmd)
 			else
 			{
 				fprintf(stderr,"Invalid Command");
-				//TODO freept();
+				free_tree(cmd);
 				return NULL;
 			}
 
 			return cmd;
+		}
+	}
+
+	for(i=start;i<=end;i++)
+	{
+		if(!strcmp(tokens[i],"<") || !strcmp(tokens[i],">"))
+		{
+			int left_valid=0,right_valid=0;
+			struct cmdline* leftnode;
+			struct cmdline* rightnode;
+			leftnode = creatpt(tokens,start,i-1,&left_valid);
+			rightnode = creatpt(tokens,i+1,end,&right_valid);
+			cmd->type = REDIR;
+			if(!strcmp(tokens[i],">"))
+				cmd->fd = 1;
+			else
+				cmd->fd = 0;
+			cmd->left = leftnode;
+			cmd->right = rightnode;
+			cmd->argsc = 1;
+			cmd->argsv = &tokens[i+1];		//exactly one arg after one REDIR operator.
+			if(left_valid && right_valid && end-1 == i)
+			{
+				*validcmd = 1;
+			}
+			else
+			{
+				fprintf(stderr,"Invalid Command");
+				*validcmd = 0;
+				free_tree(cmd);
+				return NULL;
+			}
+		return cmd;
 		}
 	}
 
@@ -275,7 +309,18 @@ void run_command(struct cmdline* cmd)
 
 	else if(cmd->type == REDIR) 			//Run if command contains the redirectional operator.
 	{
-		//TODO
+		close(cmd->fd);
+		int fd;
+		if(fd = open(cmd->argsv[0], O_WRONLY|O_CREAT|O_TRUNC, 0444) < 0)
+		{
+			fprintf(stderr,"%s File Opend Failed. %s",cmd->argsv[0],strerror(errno));
+			cleanup_(globltokens, globlcmd);
+			exit(1);
+		}
+		run_command(cmd->left);
+		close(fd);
+		cleanup_(globltokens, globlcmd);
+		exit(0);
 	}
 
 	else if(cmd->type == BASECMD)
