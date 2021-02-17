@@ -287,10 +287,10 @@ void run_command(struct cmdline* cmd)
 			exit(1);
 		}
 
-		if(fork() == 0)						//"wc | ls" in this right "ls" is parent and "wc" is running in child process. 
+		if(fork() == 0)					//For Ex. "ls | wc" (in this "wc" will run in parent and "ls" will run in child process. 
 		{
 			close(1);
-			dup(p[1]);     					//STDOUT now goes to PIPE
+			dup(p[1]);     				//STDOUT now goes to PIPE
 			close(p[0]);
 			close(p[1]);
 			run_command(cmd->left);
